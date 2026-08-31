@@ -1,7 +1,7 @@
 --[[
 
 =====================================================================
-==================== READ THIS BEFORE CONTINUING ====================
+==================== read this before continuing ====================
 =====================================================================
 ========                                    .-----.          ========
 ========         .----------------------.   | === |          ========
@@ -101,6 +101,10 @@ do
   -- Set to true if you have a Nerd Font installed and selected in the terminal
   vim.g.have_nerd_font = true
 
+  -- silence unused neovim language providers to speed up startup
+  vim.g.loaded_node_provider = 0
+  vim.g.loaded_perl_provider = 0
+  vim.g.loaded_ruby_provider = 0
   -- [[ Setting options ]]
   --  See `:help vim.o`
   -- NOTE: You can change these options as you wish!
@@ -240,6 +244,16 @@ do
   -- vim.keymap.set("n", "<C-S-j>", "<C-w>J", { desc = "Move window to the lower" })
   -- vim.keymap.set("n", "<C-S-k>", "<C-w>K", { desc = "Move window to the upper" })
 
+  -- [[ Custom Keymaps ]]
+  --  See `:help vim.keymap.set()`
+
+  -- yank entire buffer/file to clipboard 
+  vim.keymap.set("n", "<leader>ya", function()
+    local content = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
+    vim.fn.setreg("+", content)
+    vim.notify("Copied buffer to clipboard!", vim.log.levels.INFO)
+  end, { desc = "Yank all lines to clipboard" })
+
   -- [[ Basic Autocommands ]]
   --  See `:help lua-guide-autocommands`
 
@@ -252,6 +266,82 @@ do
     callback = function() vim.hl.on_yank() end,
   })
 end
+  -- Copy relative file path to clipboard (e.g., lua/custom/keymaps.lua)
+  vim.keymap.set('n', '<leader>yf', function()
+    local path = vim.fn.expand('%:.')
+    if path == '' then
+      vim.notify('No file path found', vim.log.levels.WARN)
+      return
+    end
+    vim.fn.setreg('+', path)
+    vim.notify('Copied relative path: ' .. path, vim.log.levels.INFO)
+  end, { desc = 'Yank relative [f]ile path' })
+
+  -- Copy full absolute file path to clipboard (e.g., /Users/sriram/.../init.lua)
+  vim.keymap.set('n', '<leader>yF', function()
+    local path = vim.fn.expand('%:p')
+    if path == '' then
+      vim.notify('No file path found', vim.log.levels.WARN)
+      return
+    end
+    vim.fn.setreg('+', path)
+    vim.notify('Copied full path: ' .. path, vim.log.levels.INFO)
+  end, { desc = 'Yank full absolute [F]ile path' })
+
+  -- Copy file path + line range in visual mode (e.g., init.lua:120-145)
+  vim.keymap.set('v', '<leader>yl', function()
+    local path = vim.fn.expand('%:.')
+    if path == '' then
+      vim.notify('No file path found', vim.log.levels.WARN)
+      return
+    end
+
+    local line_start = vim.fn.line('v')
+    local line_end = vim.fn.line('.')
+
+    if line_start > line_end then
+      line_start, line_end = line_end, line_start
+    end
+
+    local reference = string.format('%s:%d-%d', path, line_start, line_end)
+    vim.fn.setreg('+', reference)
+    vim.notify('Copied context: ' .. reference, vim.log.levels.INFO)
+  end, { desc = 'Yank file path with [l]ine range' })
+
+  -- [[ Custom Autocommands ]]
+  -- Custom :checkhealth provider for duplicate keymaps
+  vim.api.nvim_create_autocmd("User", {
+    pattern = "HealthCheck",
+    callback = function()
+      local health = vim.health or require("health")
+      health.start("Custom Keymap Collision Check")
+
+      local modes = { "n", "i", "v", "x", "s", "o" }
+      local seen = {}
+      local duplicates = {}
+
+      for _, mode in ipairs(modes) do
+        local mappings = vim.api.nvim_get_keymap(mode)
+        for _, map in ipairs(mappings) do
+          -- Ignore automatically generated buffer-local or internal mappings without descriptions
+          local key = string.format("[%s] %s", mode, map.lhs)
+          if seen[key] then
+            table.insert(duplicates, string.format("Mode '%s' key '%s' is mapped multiple times (e.g. to '%s' and '%s')", mode, map.lhs, seen[key].rhs or map.rhs or "lua function", map.rhs or "lua function"))
+          else
+            seen[key] = map
+          end
+        end
+      end
+
+      if #duplicates > 0 then
+        for _, dup in ipairs(duplicates) do
+          health.warn(dup)
+        end
+      else
+        health.ok("No exact duplicate keymaps found across global mappings.")
+      end
+    end,
+  })
 
 -- ============================================================
 -- SECTION 3: PLUGIN MANAGER INTRO
@@ -771,6 +861,16 @@ do
     vim.lsp.config(name, server)
     vim.lsp.enable(name)
   end
+  -- Restrict Mason to API-only registry lookups to silence missing system binary warnings 
+  -- (PHP, Julia, LuaRocks)
+  require("mason").setup({
+    providers = {
+      "mason.providers.registry-api",
+    },
+  })
+
+  -- Associate .gotmpl file extension with Go templates to prevent gopls LSP healthcheck warnings
+  vim.filetype.add({ extension = { gotmpl = "gotmpl" } })
 end
 
 -- ============================================================
