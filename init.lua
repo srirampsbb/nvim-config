@@ -92,6 +92,15 @@ do
   -- Enable faster startup by caching compiled Lua modules
   vim.loader.enable()
 
+  -- Shim deprecated vim.F.if_nil → vim.nonnil (removed in Nvim 0.15).
+  -- Plenary.nvim is archived and still calls vim.F.if_nil; this prevents the warning.
+  if vim.nonnil and not vim.F._if_nil_patched then
+    vim.F.if_nil = function(val, default)
+      return vim.nonnil(val, default)
+    end
+    vim.F._if_nil_patched = true
+  end
+
   -- Set <space> as the leader key
   -- See `:help mapleader`
   --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
@@ -102,6 +111,7 @@ do
   vim.g.have_nerd_font = true
 
   -- silence unused neovim language providers to speed up startup
+  vim.g.loaded_python3_provider = 0
   vim.g.loaded_node_provider = 0
   vim.g.loaded_perl_provider = 0
   vim.g.loaded_ruby_provider = 0
@@ -122,10 +132,46 @@ do
   -- Don't show the mode, since it's already in the status line
   vim.o.showmode = false
 
-  -- Sync clipboard between OS and Neovim.
-  --  Schedule the setting after `UiEnter` because it can increase startup-time.
-  --  Remove this option if you want your OS clipboard to remain independent.
+  -- Sync clipboard between OS and Neovim via OSC 52 (works over SSH + herdr/tmux).
+  -- Copy uses OSC 52 escape sequences (terminal writes to local clipboard).
+  -- Paste falls back to empty — use terminal paste (Ctrl+Shift+V / Cmd+V) instead,
+  -- because OSC 52 paste hangs waiting for a reply that tmux doesn't forward.
   --  See `:help 'clipboard'`
+  -- OSC 52 is a terminal escape sequence (ESC]52;...) that lets the running
+  -- program (Neovim) set the terminal emulator's clipboard. It works over
+  -- SSH and tmux because the escape sequence travels inline with the terminal
+  -- I/O stream — no X11/Wayland socket or pbcopy needed on the server side.
+  local osc52 = require('vim.ui.clipboard.osc52')
+  vim.g.clipboard = {
+    name = 'OSC 52',
+    copy = {
+      -- Custom copy wrappers that do TWO things on every yank:
+      --   1. Set the local '+ / '* / '" registers so `p` and other
+      --      register-based operations work inside Neovim.
+      --   2. Call osc52.copy() to emit the ESC]52;c;<base64> BEL sequence
+      --      so the terminal (or tmux + OSC 52 forwarding) captures the text
+      --      into the system clipboard.
+      -- Without step 1 the '+' register (and its alias '"') stays empty,
+      -- causing E353 "Nothing in register "" on the next paste.
+      ['+'] = function(lines, mode)
+        vim.fn.setreg('+', lines, mode)
+        vim.fn.setreg('0', lines, mode)
+        osc52.copy('+')(lines)
+      end,
+      ['*'] = function(lines, mode)
+        vim.fn.setreg('*', lines, mode)
+        vim.fn.setreg('0', lines, mode)
+        osc52.copy('*')(lines)
+      end,
+    },
+    paste = {
+      -- `unnamedplus` routes `p` through the '+' clipboard provider. Read
+      -- register `0`, which Neovim always populates with the latest yank,
+      -- instead of reading `+` or the unnamed alias from inside this callback.
+      ['+'] = function() return vim.fn.getreg('0', 1, true) end,
+      ['*'] = function() return vim.fn.getreg('0', 1, true) end,
+    },
+  }
   vim.schedule(function() vim.o.clipboard = 'unnamedplus' end)
 
   -- Enable break indent
@@ -167,6 +213,9 @@ do
 
   -- Show which line your cursor is on
   vim.o.cursorline = true
+
+  -- set the cursor to a line
+  vim.o.guicursor = "a:ver25"
 
   -- Minimal number of screen lines to keep above and below the cursor.
   vim.o.scrolloff = 10
@@ -303,7 +352,7 @@ end
       line_start, line_end = line_end, line_start
     end
 
-    local reference = string.format('%s:%d-%d', path, line_start, line_end)
+    local reference = string.format('@%s L%d-%d', path, line_start, line_end)
     vim.fn.setreg('+', reference)
     vim.notify('Copied context: ' .. reference, vim.log.levels.INFO)
   end, { desc = 'Yank file path with [l]ine range' })
@@ -472,18 +521,23 @@ do
   -- change the command under that to load whatever the name of that colorscheme is.
   --
   -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
-  vim.pack.add { gh 'folke/tokyonight.nvim' }
-  ---@diagnostic disable-next-line: missing-fields
-  require('tokyonight').setup {
-    styles = {
-      comments = { italic = false }, -- Disable italics in comments
+  vim.pack.add {
+    gh('catppuccin/nvim', { name = 'catppuccin' }),
+  }
+
+  require('catppuccin').setup {
+    transparent_background = true,
+    integrations = {
+      telescope = {
+        enabled = true,
+      },
     },
   }
 
   -- Load the colorscheme here.
   -- Like many other themes, this one has different styles, and you could load
   -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
-  vim.cmd.colorscheme 'tokyonight-night'
+  vim.cmd.colorscheme 'catppuccin'
 
   -- Highlight todo, notes, etc in comments
   vim.pack.add { gh 'folke/todo-comments.nvim' }
@@ -1054,7 +1108,6 @@ do
     end,
   })
 end
-
 -- ============================================================
 -- SECTION 10: OPTIONAL EXAMPLES / NEXT STEPS
 -- kickstart.plugins.* examples
