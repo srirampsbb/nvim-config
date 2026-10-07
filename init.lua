@@ -296,7 +296,7 @@ do
   -- [[ Custom Keymaps ]]
   --  See `:help vim.keymap.set()`
 
-  -- yank entire buffer/file to clipboard 
+  -- yank entire buffer/file to clipboard
   vim.keymap.set("n", "<leader>ya", function()
     local content = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
     vim.fn.setreg("+", content)
@@ -844,8 +844,12 @@ do
   ---@type table<string, vim.lsp.Config>
   local servers = {
     -- clangd = {},
-    gopls = {},
     pyright = {},
+    gopls = {},
+    bashls = {},
+    shuck = {},
+    jsonls = {},
+    yamlls = {},
     rust_analyzer = {},
     --
     -- Some languages (like typescript) have entire language plugins that can be useful:
@@ -896,9 +900,6 @@ do
     gh 'WhoIsSethDaniel/mason-tool-installer.nvim',
   }
 
-  -- Automatically install LSPs and related tools to stdpath for Neovim
-  require('mason').setup {}
-
   -- Translates between nvim-lspconfig server names and mason.nvim package names (e.g. lua_ls <-> lua-language-server)
   require('mason-lspconfig').setup {
     automatic_enable = false, -- Change this to true if you want to automatically enable servers that are installed manually (e.g. via :Mason / :MasonInstall)
@@ -922,7 +923,7 @@ do
     vim.lsp.config(name, server)
     vim.lsp.enable(name)
   end
-  -- Restrict Mason to API-only registry lookups to silence missing system binary warnings 
+  -- Restrict Mason to API-only registry lookups to silence missing system binary warnings
   -- (PHP, Julia, LuaRocks)
   require("mason").setup({
     providers = {
@@ -946,8 +947,15 @@ do
     format_on_save = function(bufnr)
       -- You can specify filetypes to autoformat on save here:
       local enabled_filetypes = {
-        -- lua = true,
-        -- python = true,
+        lua = true,
+        python = true,
+        go = true,
+        json = true,
+        yaml = true,
+        markdown = true,
+        zsh = true,
+        bash = true,
+        sh = true
       }
       if enabled_filetypes[vim.bo[bufnr].filetype] then
         return { timeout_ms = 500 }
@@ -962,7 +970,18 @@ do
     formatters_by_ft = {
       -- rust = { 'rustfmt' },
       -- Conform can also run multiple formatters sequentially
-      -- python = { "isort", "black" },
+      python = { "ruff_fix", "ruff_format", "ruff_organize_imports" },
+      go = {"goimports", "gofmt"},
+      -- Shell scripts (zsh, sh, bash)
+      bash = { "shfmt" },
+      sh = { "shfmt" },
+      zsh = { "shfmt" },
+      -- Data formats (JSON and YAML)
+      json = { "jq" }, -- or { "prettierd", "prettier", stop_after_first = true }
+      yaml = { "prettier" },
+      -- Use the "_" filetype to run formatters on filetypes that don't
+      -- have other formatters configured.
+      ["_"] = { "trim_whitespace" },
       --
       -- You can use 'stop_after_first' to run the first available formatter from the list
       -- javascript = { "prettierd", "prettier", stop_after_first = true },
