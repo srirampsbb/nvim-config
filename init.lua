@@ -982,9 +982,9 @@ do
       python = { "ruff_fix", "ruff_format", "ruff_organize_imports" },
       go = {"goimports", "gofmt"},
       -- Shell scripts (zsh, sh, bash)
-      bash = { "shfmt" },
-      sh = { "shfmt" },
-      zsh = { "shfmt" },
+      bash = { "shuck" },
+      sh = { "shuck" },
+      zsh = { "shuck" },
       -- Data formats (JSON and YAML)
       json = { "jq" }, -- or { "prettierd", "prettier", stop_after_first = true }
       yaml = { "prettier" },
