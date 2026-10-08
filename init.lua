@@ -858,7 +858,7 @@ do
     -- But for many setups, the LSP (`ts_ls`) will work just fine
     -- ts_ls = {},
 
-    stylua = {}, -- Used to format Lua code
+    -- stylua = {}, -- Used to format Lua code
 
     -- Special Lua Config, as recommended by neovim help docs
     lua_ls = {
@@ -899,10 +899,16 @@ do
     gh 'mason-org/mason-lspconfig.nvim',
     gh 'WhoIsSethDaniel/mason-tool-installer.nvim',
   }
-
+  -- 1. Point explicitly to Cargo's binary to prevent Mason path hijacking
+  vim.lsp.config('shuck', {
+    cmd = { vim.fn.expand('~/.cargo/bin/shuck'), 'server' },
+    filetypes = { 'zsh', 'sh' },
+    root_markers = { '.git', '.zshrc', '*.zsh' },
+  })
   -- Translates between nvim-lspconfig server names and mason.nvim package names (e.g. lua_ls <-> lua-language-server)
   require('mason-lspconfig').setup {
     automatic_enable = false, -- Change this to true if you want to automatically enable servers that are installed manually (e.g. via :Mason / :MasonInstall)
+    ignore_install = { 'shuck' }, -- Explicitly ignore shuck
   }
 
   -- Ensure the servers and tools above are installed
@@ -912,7 +918,10 @@ do
   --    :Mason
   --
   -- You can press `g?` for help in this menu.
-  local ensure_installed = vim.tbl_keys(servers or {})
+  -- Filter out shuck from mason-tool-installer
+  local ensure_installed = vim.tbl_filter(function(server)
+    return server ~= 'shuck'
+  end, vim.tbl_keys(servers or {}))
   vim.list_extend(ensure_installed, {
     -- You can add other tools here that you want Mason to install
   })
