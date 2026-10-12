@@ -224,6 +224,11 @@ do
   -- instead raise a dialog asking if you wish to save the current file(s)
   -- See `:help 'confirm'`
   vim.o.confirm = true
+
+  -- Verbose LSP client logging. `debug` (or `trace`) is required to see the
+  -- client's RPC traffic and server stderr in `:LspLog`; the default `warn` is
+  -- quieter and faster. Revert to 'warn' when you're done troubleshooting.
+  vim.lsp.log.set_level 'debug'
 end
 
 -- ============================================================
@@ -314,6 +319,42 @@ do
     group = vim.api.nvim_create_augroup('kickstart-highlight-yank', { clear = true }),
     callback = function() vim.hl.on_yank() end,
   })
+
+  -- [[ Convenience LSP commands ]]
+  -- Nvim 0.11+ replaced the capitalized nvim-lspconfig commands with lowercase
+  -- `:lsp …`. Recreate the familiar names as thin wrappers over the core ones.
+  local function complete_clients(arg)
+    return vim.tbl_filter(
+      function(name) return name:sub(1, #arg) == arg end,
+      vim.tbl_map(function(c) return c.name end, vim.lsp.get_clients())
+    )
+  end
+
+  vim.api.nvim_create_user_command('LspInfo', 'checkhealth vim.lsp', { desc = 'Alias to `:checkhealth vim.lsp`' })
+  vim.api.nvim_create_user_command('LspLog', function() vim.cmd('tabnew ' .. vim.lsp.log.get_filename()) end, { desc = 'Open the Nvim LSP client log' })
+  vim.api.nvim_create_user_command('LspRestart', function(args) vim.cmd('lsp restart ' .. args.args) end, { nargs = '*', desc = 'Restart LSP clients', complete = complete_clients })
+  vim.api.nvim_create_user_command('LspStop', function(args) vim.cmd('lsp stop ' .. args.args) end, { nargs = '*', desc = 'Stop LSP clients', complete = complete_clients })
+  vim.api.nvim_create_user_command('LspStart', function(args) vim.cmd('lsp enable ' .. args.args) end, { nargs = '*', desc = 'Enable LSP configs for current/future buffers' })
+
+  -- Show the workspace root basedpyright resolved for this session, plus whether
+  -- it can see a `.venv` interpreter there (basedpyright only auto-detects
+  -- `./.venv` at the workspace root).
+  vim.api.nvim_create_user_command('ShowPyRoot', function()
+    local clients = vim.lsp.get_clients { name = 'basedpyright' }
+    if #clients == 0 then
+      vim.notify('No basedpyright client attached', vim.log.levels.WARN)
+      return
+    end
+    for _, client in ipairs(clients) do
+      local root = client.config.root_dir or '(none — single-file mode)'
+      local note = ''
+      if client.config.root_dir then
+        local python = vim.fs.joinpath(client.config.root_dir, '.venv', 'bin', 'python')
+        note = vim.fn.executable(python) == 1 and ('  detects: ' .. python) or ('  no .venv/bin/python under root')
+      end
+      print(('basedpyright root_dir: %s\n%s'):format(root, note))
+    end
+  end, { desc = 'Show basedpyright [Py] workspace root and detected venv' })
 end
   -- Copy relative file path to clipboard (e.g., lua/custom/keymaps.lua)
   vim.keymap.set('n', '<leader>yf', function()
@@ -844,7 +885,21 @@ do
   ---@type table<string, vim.lsp.Config>
   local servers = {
     -- clangd = {},
-    pyright = {},
+    -- basedpyright auto-detects a `.venv` in the project root, so no manual
+    -- interpreter wiring is needed. `typeCheckingMode = 'standard'` tames its
+    -- very noisy default of 'recommended'; use 'recommended'/'strict' for more.
+    basedpyright = {
+      settings = {
+        basedpyright = {
+          analysis = {
+            autoSearchPaths = true,
+            useLibraryCodeForTypes = true,
+            diagnosticMode = 'openFilesOnly',
+            typeCheckingMode = 'standard',
+          },
+        },
+      },
+    },
     gopls = {},
     bashls = {},
     shuck = {},
@@ -932,6 +987,11 @@ do
     vim.lsp.config(name, server)
     vim.lsp.enable(name)
   end
+
+  -- Hard-disable pyright: basedpyright is the Python LSP here. This stops any
+  -- pyright client and prevents it from auto-activating on future buffers, even
+  -- if the pyright package is still installed.
+  vim.lsp.enable('pyright', false)
   -- Restrict Mason to API-only registry lookups to silence missing system binary warnings
   -- (PHP, Julia, LuaRocks)
   require("mason").setup({
@@ -1168,8 +1228,6 @@ do
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   require 'custom.plugins'
-  -- Initializes your custom Python autocommand module
-  require('custom.python').setup()
 end
 
 -- The line beneath this is called `modeline`. See `:help modeline`
