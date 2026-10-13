@@ -95,9 +95,7 @@ do
   -- Shim deprecated vim.F.if_nil → vim.nonnil (removed in Nvim 0.15).
   -- Plenary.nvim is archived and still calls vim.F.if_nil; this prevents the warning.
   if vim.nonnil and not vim.F._if_nil_patched then
-    vim.F.if_nil = function(val, default)
-      return vim.nonnil(val, default)
-    end
+    vim.F.if_nil = function(val, default) return vim.nonnil(val, default) end
     vim.F._if_nil_patched = true
   end
 
@@ -141,7 +139,7 @@ do
   -- program (Neovim) set the terminal emulator's clipboard. It works over
   -- SSH and tmux because the escape sequence travels inline with the terminal
   -- I/O stream — no X11/Wayland socket or pbcopy needed on the server side.
-  local osc52 = require('vim.ui.clipboard.osc52')
+  local osc52 = require 'vim.ui.clipboard.osc52'
   vim.g.clipboard = {
     name = 'OSC 52',
     copy = {
@@ -156,12 +154,12 @@ do
       ['+'] = function(lines, mode)
         vim.fn.setreg('+', lines, mode)
         vim.fn.setreg('0', lines, mode)
-        osc52.copy('+')(lines)
+        osc52.copy '+'(lines)
       end,
       ['*'] = function(lines, mode)
         vim.fn.setreg('*', lines, mode)
         vim.fn.setreg('0', lines, mode)
-        osc52.copy('*')(lines)
+        osc52.copy '*'(lines)
       end,
     },
     paste = {
@@ -215,7 +213,7 @@ do
   vim.o.cursorline = true
 
   -- set the cursor to a line
-  vim.o.guicursor = "a:ver25"
+  vim.o.guicursor = 'a:ver25'
 
   -- Minimal number of screen lines to keep above and below the cursor.
   vim.o.scrolloff = 10
@@ -302,11 +300,11 @@ do
   --  See `:help vim.keymap.set()`
 
   -- yank entire buffer/file to clipboard
-  vim.keymap.set("n", "<leader>ya", function()
-    local content = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
-    vim.fn.setreg("+", content)
-    vim.notify("Copied buffer to clipboard!", vim.log.levels.INFO)
-  end, { desc = "Yank all lines to clipboard" })
+  vim.keymap.set('n', '<leader>ya', function()
+    local content = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
+    vim.fn.setreg('+', content)
+    vim.notify('Copied buffer to clipboard!', vim.log.levels.INFO)
+  end, { desc = 'Yank all lines to clipboard' })
 
   -- [[ Basic Autocommands ]]
   --  See `:help lua-guide-autocommands`
@@ -324,17 +322,26 @@ do
   -- Nvim 0.11+ replaced the capitalized nvim-lspconfig commands with lowercase
   -- `:lsp …`. Recreate the familiar names as thin wrappers over the core ones.
   local function complete_clients(arg)
-    return vim.tbl_filter(
-      function(name) return name:sub(1, #arg) == arg end,
-      vim.tbl_map(function(c) return c.name end, vim.lsp.get_clients())
-    )
+    return vim.tbl_filter(function(name) return name:sub(1, #arg) == arg end, vim.tbl_map(function(c) return c.name end, vim.lsp.get_clients()))
   end
 
   vim.api.nvim_create_user_command('LspInfo', 'checkhealth vim.lsp', { desc = 'Alias to `:checkhealth vim.lsp`' })
   vim.api.nvim_create_user_command('LspLog', function() vim.cmd('tabnew ' .. vim.lsp.log.get_filename()) end, { desc = 'Open the Nvim LSP client log' })
-  vim.api.nvim_create_user_command('LspRestart', function(args) vim.cmd('lsp restart ' .. args.args) end, { nargs = '*', desc = 'Restart LSP clients', complete = complete_clients })
-  vim.api.nvim_create_user_command('LspStop', function(args) vim.cmd('lsp stop ' .. args.args) end, { nargs = '*', desc = 'Stop LSP clients', complete = complete_clients })
-  vim.api.nvim_create_user_command('LspStart', function(args) vim.cmd('lsp enable ' .. args.args) end, { nargs = '*', desc = 'Enable LSP configs for current/future buffers' })
+  vim.api.nvim_create_user_command(
+    'LspRestart',
+    function(args) vim.cmd('lsp restart ' .. args.args) end,
+    { nargs = '*', desc = 'Restart LSP clients', complete = complete_clients }
+  )
+  vim.api.nvim_create_user_command(
+    'LspStop',
+    function(args) vim.cmd('lsp stop ' .. args.args) end,
+    { nargs = '*', desc = 'Stop LSP clients', complete = complete_clients }
+  )
+  vim.api.nvim_create_user_command(
+    'LspStart',
+    function(args) vim.cmd('lsp enable ' .. args.args) end,
+    { nargs = '*', desc = 'Enable LSP configs for current/future buffers' }
+  )
 
   -- Show the workspace root basedpyright resolved for this session, plus whether
   -- it can see a `.venv` interpreter there (basedpyright only auto-detects
@@ -350,88 +357,97 @@ do
       local note = ''
       if client.config.root_dir then
         local python = vim.fs.joinpath(client.config.root_dir, '.venv', 'bin', 'python')
-        note = vim.fn.executable(python) == 1 and ('  detects: ' .. python) or ('  no .venv/bin/python under root')
+        note = vim.fn.executable(python) == 1 and ('  detects: ' .. python) or '  no .venv/bin/python under root'
       end
       print(('basedpyright root_dir: %s\n%s'):format(root, note))
     end
   end, { desc = 'Show basedpyright [Py] workspace root and detected venv' })
 end
-  -- Copy relative file path to clipboard (e.g., lua/custom/keymaps.lua)
-  vim.keymap.set('n', '<leader>yf', function()
-    local path = vim.fn.expand('%:.')
-    if path == '' then
-      vim.notify('No file path found', vim.log.levels.WARN)
-      return
-    end
-    vim.fn.setreg('+', path)
-    vim.notify('Copied relative path: ' .. path, vim.log.levels.INFO)
-  end, { desc = 'Yank relative [f]ile path' })
+-- Copy relative file path to clipboard (e.g., lua/custom/keymaps.lua)
+vim.keymap.set('n', '<leader>yf', function()
+  local path = vim.fn.expand '%:.'
+  if path == '' then
+    vim.notify('No file path found', vim.log.levels.WARN)
+    return
+  end
+  vim.fn.setreg('+', path)
+  vim.notify('Copied relative path: ' .. path, vim.log.levels.INFO)
+end, { desc = 'Yank relative [f]ile path' })
 
-  -- Copy full absolute file path to clipboard (e.g., /Users/sriram/.../init.lua)
-  vim.keymap.set('n', '<leader>yF', function()
-    local path = vim.fn.expand('%:p')
-    if path == '' then
-      vim.notify('No file path found', vim.log.levels.WARN)
-      return
-    end
-    vim.fn.setreg('+', path)
-    vim.notify('Copied full path: ' .. path, vim.log.levels.INFO)
-  end, { desc = 'Yank full absolute [F]ile path' })
+-- Copy full absolute file path to clipboard (e.g., /Users/sriram/.../init.lua)
+vim.keymap.set('n', '<leader>yF', function()
+  local path = vim.fn.expand '%:p'
+  if path == '' then
+    vim.notify('No file path found', vim.log.levels.WARN)
+    return
+  end
+  vim.fn.setreg('+', path)
+  vim.notify('Copied full path: ' .. path, vim.log.levels.INFO)
+end, { desc = 'Yank full absolute [F]ile path' })
 
-  -- Copy file path + line range in visual mode (e.g., init.lua:120-145)
-  vim.keymap.set('v', '<leader>yl', function()
-    local path = vim.fn.expand('%:.')
-    if path == '' then
-      vim.notify('No file path found', vim.log.levels.WARN)
-      return
-    end
+-- Copy file path + line range in visual mode (e.g., init.lua:120-145)
+vim.keymap.set('v', '<leader>yl', function()
+  local path = vim.fn.expand '%:.'
+  if path == '' then
+    vim.notify('No file path found', vim.log.levels.WARN)
+    return
+  end
 
-    local line_start = vim.fn.line('v')
-    local line_end = vim.fn.line('.')
+  local line_start = vim.fn.line 'v'
+  local line_end = vim.fn.line '.'
 
-    if line_start > line_end then
-      line_start, line_end = line_end, line_start
-    end
+  if line_start > line_end then
+    line_start, line_end = line_end, line_start
+  end
 
-    local reference = string.format('@%s L%d-%d', path, line_start, line_end)
-    vim.fn.setreg('+', reference)
-    vim.notify('Copied context: ' .. reference, vim.log.levels.INFO)
-  end, { desc = 'Yank file path with [l]ine range' })
+  local reference = string.format('@%s L%d-%d', path, line_start, line_end)
+  vim.fn.setreg('+', reference)
+  vim.notify('Copied context: ' .. reference, vim.log.levels.INFO)
+end, { desc = 'Yank file path with [l]ine range' })
 
-  -- [[ Custom Autocommands ]]
-  -- Custom :checkhealth provider for duplicate keymaps
-  vim.api.nvim_create_autocmd("User", {
-    pattern = "HealthCheck",
-    callback = function()
-      local health = vim.health or require("health")
-      health.start("Custom Keymap Collision Check")
+-- [[ Custom Autocommands ]]
+-- Custom :checkhealth provider for duplicate keymaps
+vim.api.nvim_create_autocmd('User', {
+  pattern = 'HealthCheck',
+  callback = function()
+    local health = vim.health or require 'health'
+    health.start 'Custom Keymap Collision Check'
 
-      local modes = { "n", "i", "v", "x", "s", "o" }
-      local seen = {}
-      local duplicates = {}
+    local modes = { 'n', 'i', 'v', 'x', 's', 'o' }
+    local seen = {}
+    local duplicates = {}
 
-      for _, mode in ipairs(modes) do
-        local mappings = vim.api.nvim_get_keymap(mode)
-        for _, map in ipairs(mappings) do
-          -- Ignore automatically generated buffer-local or internal mappings without descriptions
-          local key = string.format("[%s] %s", mode, map.lhs)
-          if seen[key] then
-            table.insert(duplicates, string.format("Mode '%s' key '%s' is mapped multiple times (e.g. to '%s' and '%s')", mode, map.lhs, seen[key].rhs or map.rhs or "lua function", map.rhs or "lua function"))
-          else
-            seen[key] = map
-          end
+    for _, mode in ipairs(modes) do
+      local mappings = vim.api.nvim_get_keymap(mode)
+      for _, map in ipairs(mappings) do
+        -- Ignore automatically generated buffer-local or internal mappings without descriptions
+        local key = string.format('[%s] %s', mode, map.lhs)
+        if seen[key] then
+          table.insert(
+            duplicates,
+            string.format(
+              "Mode '%s' key '%s' is mapped multiple times (e.g. to '%s' and '%s')",
+              mode,
+              map.lhs,
+              seen[key].rhs or map.rhs or 'lua function',
+              map.rhs or 'lua function'
+            )
+          )
+        else
+          seen[key] = map
         end
       end
+    end
 
-      if #duplicates > 0 then
-        for _, dup in ipairs(duplicates) do
-          health.warn(dup)
-        end
-      else
-        health.ok("No exact duplicate keymaps found across global mappings.")
+    if #duplicates > 0 then
+      for _, dup in ipairs(duplicates) do
+        health.warn(dup)
       end
-    end,
-  })
+    else
+      health.ok 'No exact duplicate keymaps found across global mappings.'
+    end
+  end,
+})
 
 -- ============================================================
 -- SECTION 3: PLUGIN MANAGER INTRO
@@ -687,9 +703,7 @@ do
     pickers = {
       find_files = {
         hidden = true,
-        find_command = function()
-          return { 'rg', '--files', '--no-ignore' }
-        end,
+        find_command = function() return { 'rg', '--files', '--no-ignore' } end,
       },
     },
     extensions = {
@@ -956,7 +970,7 @@ do
   }
   -- 1. Point explicitly to Cargo's binary to prevent Mason path hijacking
   vim.lsp.config('shuck', {
-    cmd = { vim.fn.expand('~/.cargo/bin/shuck'), 'server' },
+    cmd = { vim.fn.expand '~/.cargo/bin/shuck', 'server' },
     filetypes = { 'zsh', 'sh' },
     root_markers = { '.git', '.zshrc', '*.zsh' },
   })
@@ -974,9 +988,7 @@ do
   --
   -- You can press `g?` for help in this menu.
   -- Filter out shuck from mason-tool-installer
-  local ensure_installed = vim.tbl_filter(function(server)
-    return server ~= 'shuck'
-  end, vim.tbl_keys(servers or {}))
+  local ensure_installed = vim.tbl_filter(function(server) return server ~= 'shuck' end, vim.tbl_keys(servers or {}))
   vim.list_extend(ensure_installed, {
     -- You can add other tools here that you want Mason to install
   })
@@ -994,14 +1006,14 @@ do
   vim.lsp.enable('pyright', false)
   -- Restrict Mason to API-only registry lookups to silence missing system binary warnings
   -- (PHP, Julia, LuaRocks)
-  require("mason").setup({
+  require('mason').setup {
     providers = {
-      "mason.providers.registry-api",
+      'mason.providers.registry-api',
     },
-  })
+  }
 
   -- Associate .gotmpl file extension with Go templates to prevent gopls LSP healthcheck warnings
-  vim.filetype.add({ extension = { gotmpl = "gotmpl" } })
+  vim.filetype.add { extension = { gotmpl = 'gotmpl' } }
 end
 
 -- ============================================================
@@ -1024,7 +1036,7 @@ do
         markdown = true,
         zsh = true,
         bash = true,
-        sh = true
+        sh = true,
       }
       if enabled_filetypes[vim.bo[bufnr].filetype] then
         return { timeout_ms = 500 }
@@ -1039,18 +1051,18 @@ do
     formatters_by_ft = {
       -- rust = { 'rustfmt' },
       -- Conform can also run multiple formatters sequentially
-      python = { "ruff_fix", "ruff_format", "ruff_organize_imports" },
-      go = {"goimports", "gofmt"},
+      python = { 'ruff_fix', 'ruff_format', 'ruff_organize_imports' },
+      go = { 'goimports', 'gofmt' },
       -- Shell scripts (zsh, sh, bash)
-      bash = { "shuck" },
-      sh = { "shuck" },
-      zsh = { "shuck" },
+      bash = { 'shuck' },
+      sh = { 'shuck' },
+      zsh = { 'shuck' },
       -- Data formats (JSON and YAML)
-      json = { "jq" }, -- or { "prettierd", "prettier", stop_after_first = true }
-      yaml = { "prettier" },
+      json = { 'jq' }, -- or { "prettierd", "prettier", stop_after_first = true }
+      yaml = { 'prettier' },
       -- Use the "_" filetype to run formatters on filetypes that don't
       -- have other formatters configured.
-      ["_"] = { "trim_whitespace" },
+      ['_'] = { 'trim_whitespace' },
       --
       -- You can use 'stop_after_first' to run the first available formatter from the list
       -- javascript = { "prettierd", "prettier", stop_after_first = true },
