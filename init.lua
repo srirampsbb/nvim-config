@@ -915,7 +915,8 @@ do
       },
     },
     gopls = {},
-    bashls = {},
+    -- Shell LSP is shuck (configured below). bashls was removed so that
+    -- `sh`/`bash` buffers don't attach duplicate clients/diagnostics.
     shuck = {},
     jsonls = {},
     yamlls = {},
@@ -971,8 +972,8 @@ do
   -- 1. Point explicitly to Cargo's binary to prevent Mason path hijacking
   vim.lsp.config('shuck', {
     cmd = { vim.fn.expand '~/.cargo/bin/shuck', 'server' },
-    filetypes = { 'zsh', 'sh' },
-    root_markers = { '.git', '.zshrc', '*.zsh' },
+    filetypes = { 'zsh', 'sh', 'bash' },
+    root_markers = { '.git', '.zshrc' },
   })
   -- Translates between nvim-lspconfig server names and mason.nvim package names (e.g. lua_ls <-> lua-language-server)
   require('mason-lspconfig').setup {
@@ -1047,16 +1048,29 @@ do
     default_format_opts = {
       lsp_format = 'fallback', -- Use external formatters if configured below, otherwise use LSP formatting. Set to `false` to disable LSP formatting entirely.
     },
+    -- External formatters. shfmt is the formatter of record (stable, honors
+    -- .editorconfig); the shuck LSP provides diagnostics and formatting, but we
+    -- prefer shfmt for deterministic, CI-matching output.
+    formatters = {
+      -- shfmt's auto-detect parses zsh-only syntax as bash and errors, so force
+      -- the dialect for zsh buffers. (`--filename` gives shfmt the real name for
+      -- error messages / editorconfig lookup.)
+      shfmt_zsh = {
+        command = 'shfmt',
+        args = { '-ln=zsh', '--filename', '$FILENAME' },
+        stdin = true,
+      },
+    },
     -- You can also specify external formatters in here.
     formatters_by_ft = {
       -- rust = { 'rustfmt' },
       -- Conform can also run multiple formatters sequentially
       python = { 'ruff_fix', 'ruff_format', 'ruff_organize_imports' },
       go = { 'goimports', 'gofmt' },
-      -- Shell scripts (zsh, sh, bash)
-      bash = { 'shuck' },
-      sh = { 'shuck' },
-      zsh = { 'shuck' },
+      -- Shell scripts: format with shfmt (zsh dialect forced), lint via shuck LSP
+      bash = { 'shfmt' },
+      sh = { 'shfmt' },
+      zsh = { 'shfmt_zsh' },
       -- Data formats (JSON and YAML)
       json = { 'jq' }, -- or { "prettierd", "prettier", stop_after_first = true }
       yaml = { 'prettier' },
