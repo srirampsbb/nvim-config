@@ -306,6 +306,10 @@ do
     vim.notify('Copied buffer to clipboard!', vim.log.levels.INFO)
   end, { desc = 'Yank all lines to clipboard' })
 
+  -- Jump to previous/next cursor position in the jump list
+  vim.keymap.set('n', 'gp', '<C-o>', { desc = 'Jump to [p]revious cursor position' })
+  vim.keymap.set('n', 'gn', '<C-i>', { desc = 'Jump to [n]ext cursor position' })
+
   -- [[ Basic Autocommands ]]
   --  See `:help lua-guide-autocommands`
 
@@ -995,6 +999,22 @@ do
   })
 
   require('mason-tool-installer').setup { ensure_installed = ensure_installed }
+
+  -- Prevent LSP clients from attaching to buffers with non-file:// URIs (e.g., octo:// buffers from octo.nvim)
+  -- gopls and other LSPs reject non-file URIs with JSON RPC parse error -32700
+  do
+    local lsp_start = vim.lsp.start
+    --- @diagnostic disable-next-line: duplicate-set-field
+    vim.lsp.start = function(config, opts)
+      opts = opts or {}
+      local bufnr = opts.bufnr or 0
+      local name = vim.api.nvim_buf_get_name(bufnr)
+      -- Block buffers with non-file URI schemes (e.g., octo://).
+      -- Regular files return paths without "://" so they pass through.
+      if name ~= '' and name:match('://') and not name:match('^file://') then return nil end
+      return lsp_start(config, opts)
+    end
+  end
 
   for name, server in pairs(servers) do
     vim.lsp.config(name, server)
