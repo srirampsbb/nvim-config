@@ -296,6 +296,12 @@ do
   -- vim.keymap.set("n", "<C-S-j>", "<C-w>J", { desc = "Move window to the lower" })
   -- vim.keymap.set("n", "<C-S-k>", "<C-w>K", { desc = "Move window to the upper" })
 
+  -- Window navigation with <leader>w
+  vim.keymap.set('n', '<leader>wh', '<C-w>h', { desc = 'Focus left window' })
+  vim.keymap.set('n', '<leader>wl', '<C-w>l', { desc = 'Focus right window' })
+  vim.keymap.set('n', '<leader>wj', '<C-w>j', { desc = 'Focus lower window' })
+  vim.keymap.set('n', '<leader>wk', '<C-w>k', { desc = 'Focus upper window' })
+
   -- [[ Custom Keymaps ]]
   --  See `:help vim.keymap.set()`
 
@@ -1011,7 +1017,7 @@ do
       local name = vim.api.nvim_buf_get_name(bufnr)
       -- Block buffers with non-file URI schemes (e.g., octo://).
       -- Regular files return paths without "://" so they pass through.
-      if name ~= '' and name:match('://') and not name:match('^file://') then return nil end
+      if name ~= '' and name:match '://' and not name:match '^file://' then return nil end
       return lsp_start(config, opts)
     end
   end

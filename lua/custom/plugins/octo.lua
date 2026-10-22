@@ -8,3 +8,5 @@ require('octo').setup {
   use_diagnostic_signs = true,
   picker = 'telescope',
 }
+
+vim.keymap.set('n', '<leader>op', ':Octo pr list<CR>', { desc = 'List GitHub PRs' })
